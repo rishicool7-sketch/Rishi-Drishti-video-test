@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rishi Drishti — Final Video Flow Test</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#18051f;color:#ffeec7;font-family:system-ui,-apple-system,"Noto Sans Devanagari",sans-serif}
+.wrap{max-width:720px;margin:auto;padding:14px 14px 100px}.top{position:sticky;top:0;z-index:20;background:#21082b;border:1px solid #d6a52e;border-radius:18px;padding:10px 12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+button{border:0;border-radius:14px;padding:13px 18px;font-size:16px;font-weight:700;color:white;background:linear-gradient(90deg,#4d20a5,#2368bd);cursor:pointer}
+.orange{background:linear-gradient(90deg,#f27708,#c84a1b)}.gold{color:#ffe7a1}.card{background:#fff4d9;color:#55352c;border:1px solid #d5a84b;border-radius:24px;padding:18px;margin:14px 0}.title{font-size:28px;font-weight:800;margin:5px 0 10px}.sub{font-size:16px;opacity:.85}.request{background:#fffaf0;border:1px solid #dccb9f;border-radius:18px;padding:16px;margin:12px 0}.request h3{margin:0 0 8px}.row{display:flex;gap:8px;flex-wrap:wrap}.row button{flex:1;min-width:130px}
+.chat{min-height:240px;background:#fffaf0;border-radius:18px;padding:14px;color:#50352f}.msg{padding:12px 14px;border-radius:18px;margin:9px 0;max-width:88%;background:#f3e6cb}.user{margin-left:auto;background:#9e4f1f;color:white}.composer{display:flex;gap:8px;margin-top:10px}.composer input{flex:1;padding:14px;border:1px solid #cbb98f;border-radius:15px;font-size:16px}
+.overlay{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:50;padding:18px}.modal{width:min(650px,100%);max-height:92vh;overflow:auto;background:#21092c;border:1px solid #d6a52e;border-radius:26px;padding:20px;color:#ffeec7}.video{height:390px;border:1px solid #cfa54a;border-radius:20px;background:radial-gradient(circle at center,#40205c,#16051d);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.guru{font-size:78px}.controls{display:flex;gap:10px;margin-top:14px}.controls button{flex:1}.close{float:right;background:transparent;font-size:30px;padding:0}
+.hidden{display:none!important}.switch{font-size:13px;padding:10px 12px}
+.note{padding:12px 14px;border-radius:14px;background:#f5e3b9;color:#68452c;margin:10px 0;border:1px solid #d5a84b}.note.success{background:#e5f3df;color:#285b2b}.note.warn{background:#fff0cf;color:#68452c}
+
+.method-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.method-card{background:#fffaf0;border:1px solid #d5a84b;border-radius:18px;padding:14px;color:#55352c;cursor:pointer}
+.method-card.active{outline:3px solid #7b3fb3;background:#f7ead0}
+.method-card h3{margin:0 0 6px;font-size:19px}.method-card p{margin:0;font-size:14px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-grid label{font-weight:700;font-size:14px;color:#55352c}
+.form-grid input{width:100%;margin-top:5px;padding:12px;border:1px solid #cbb98f;border-radius:12px;font-size:15px}
+@media(max-width:520px){.method-grid,.form-grid{grid-template-columns:1fr}}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>🙏 Rishi Drishti • <b id="roleLabel">👤 User</b></div>
+    <button class="orange switch" onclick="switchRole()">↔ User / Guruji</button>
+  </div>
+
+  <div id="appNotice" class="note hidden" role="status" aria-live="polite"></div>
+
+  <div id="userView">
+    <div class="card">
+      <div class="title">🙏 Rishi Drishti</div>
+      <div class="sub">ज्ञान • दृष्टि • मार्गदर्शन • समाधान</div>
+    </div>
+    <div class="card">
+      <h2>🔮 अपनी consultation विधि चुनें</h2>
+      <p class="sub">जन्म समय उपलब्ध हो तो कुंडली, अन्यथा सामुद्रिक शास्त्र या हस्तरेखा से consultation request भेजें।</p>
+      <div class="method-grid">
+        <div id="methodKundli" class="method-card active" onclick="selectMethod('कुंडली')">
+          <h3>🔮 जन्म कुंडली</h3><p>DOB, समय और जन्म स्थान के आधार पर consultation</p>
+        </div>
+        <div id="methodSamudrik" class="method-card" onclick="selectMethod('सामुद्रिक शास्त्र')">
+          <h3>🕉️ सामुद्रिक शास्त्र</h3><p>Live Face Reading / Samudrik guidance</p>
+        </div>
+        <div id="methodPalm" class="method-card" onclick="selectMethod('हस्तरेखा')">
+          <h3>✋ हस्तरेखा</h3><p>हाथ की रेखाओं के आधार पर guidance</p>
+        </div>
+      </div>
+      <div id="kundliFields" class="request">
+        <h3>📅 कुंडली विवरण</h3>
+        <div class="form-grid">
+          <label>जन्म तिथि<input id="dob" type="date"></label>
+          <label>जन्म समय<input id="birthTime" type="time"></label>
+          <label style="grid-column:1/-1">जन्म स्थान<input id="birthPlace" placeholder="शहर / स्थान"></label>
+        </div>
+      </div>
+      <div id="methodNote" class="note">चयन: 🔮 कुंडली</div>
+      <button class="orange" style="width:100%" onclick="sendConsultationRequest()">🙏 Consultation Request भेजें</button>
+    </div>
+
+    <div class="card">
+      <h2>📹 Video Consultation</h2>
+      <p id="userVideoState">अभी कोई active video consultation नहीं है।</p>
+      <button class="orange" style="width:100%" onclick="requestVideo()">📹 Video Call Request भेजें</button>
+    </div>
+    <div class="card hidden" id="userActive">
+      <h2>📹 Active Video Consultation</h2>
+      <p id="userActiveState">🟡 Guruji के Accept करने का इंतज़ार...</p>
+      <button class="orange" id="userVideoBtn" style="width:100%" onclick="openVideo('user')">📹 Video Call खोलें</button>
+    </div>
+    <div class="card">
+      <h2>💬 Consultation Chat</h2>
+      <div class="chat" id="chat">
+        <div class="msg">🙏 पहले अपनी consultation विधि चुनें और request भेजें। Accept होने के बाद Chat + Video Call उपलब्ध होंगे।</div>
+      </div>
+      <div class="composer">
+        <input id="userInput" placeholder="Guruji को message लिखें..." autocomplete="off">
+        <button class="orange" onclick="sendUser()">➤ भेजें</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="guruView" class="hidden">
+    <div class="card">
+      <div class="title">🧘 Guruji Dashboard</div>
+      <div class="sub">Guruji consultation & live video sessions</div>
+    </div>
+    <div class="card">
+      <h2>🔔 Video Call Requests</h2>
+      <div id="guruNoRequest" class="request">अभी कोई pending Video Call request नहीं है।</div>
+      <div id="guruRequest" class="request hidden">
+        <h3 id="guruRequestTitle">🔮 कुंडली • Demo User</h3>
+        <p id="guruRequestDetails">Consultation request</p>
+        <button class="orange" onclick="acceptConsultation()">✅ Request स्वीकार करें</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>💬 Guruji Reply</h2>
+      <div class="chat" id="guruChat">
+        <div class="msg user">नमस्ते guruji</div>
+      </div>
+      <div class="composer">
+        <input id="guruInput" placeholder="Guruji यहाँ reply लिखें..." autocomplete="off">
+        <button class="orange" onclick="sendGuru()">➤ भेजें</button>
+      </div>
+    </div>
+    <div class="card">
+      <button class="orange" style="width:100%" onclick="openVideo('guru')">📹 User के साथ Video खोलें</button>
+    </div>
+  </div>
+<div class="overlay" id="videoModal">
+  <div class="modal">
+    <button class="close" onclick="closeVideo()">×</button>
+    <h2 id="videoTitle">📹 User के साथ Video Consultation</h2>
+    <div class="video" style="position:relative;overflow:hidden">
+      <video id="localVideo" autoplay playsinline muted style="width:100%;max-height:360px;object-fit:cover;border-radius:18px;background:#111;display:none"></video>
+      <div id="videoPlaceholder">
+        <div class="guru">🧘</div>
+        <h2 id="videoPerson">Demo User</h2>
+      </div>
+      <div id="videoStatus">🟢 Video session ready</div>
+      <p id="cameraStatus">Camera अभी बंद है। Camera शुरू करने के लिए दबाएँ।</p>
+      <p id="secureHint" style="font-size:.9em;opacity:.85"></p>
+    </div>
+    <div class="controls">
+      <button id="micBtn" onclick="toggleMic()">🎙️ Mic</button>
+      <button id="cameraBtn" onclick="toggleCamera()">📹 Camera शुरू करें</button>
+      <button class="orange" onclick="endCall()">🔴 End Call</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let role='user', videoRequested=false, videoAccepted=false, consultationRequested=false, consultationAccepted=false, selectedMethod='कुंडली';
+
+function render(){
+  document.getElementById('userView').classList.toggle('hidden', role!=='user');
+  document.getElementById('guruView').classList.toggle('hidden', role!=='guru');
+  document.getElementById('roleLabel').textContent=role==='user'?'👤 User':'🧘 Guruji';
+
+  document.getElementById('guruRequest').classList.toggle('hidden', !consultationRequested || consultationAccepted);
+  document.getElementById('guruNoRequest').classList.toggle('hidden', consultationRequested && !consultationAccepted);
+
+  document.getElementById('userActive').classList.toggle('hidden', !consultationRequested);
+  if(consultationRequested){
+    document.getElementById('userActiveState').textContent =
+      consultationAccepted ? '🟢 Guruji ने consultation स्वीकार कर ली है। अब Chat और Video Call उपलब्ध हैं।' :
+      '🟡 Guruji के Accept करने का इंतज़ार...';
+    const b=document.getElementById('userVideoBtn');
+    b.disabled=!consultationAccepted;
+    b.style.opacity=consultationAccepted?'1':'.55';
+    document.getElementById('userVideoState').textContent =
+      consultationAccepted ? `🟢 ${selectedMethod} consultation active है।` : `🟡 ${selectedMethod} request pending है।`;
+  }
+  document.getElementById('guruRequestTitle').textContent = `${methodEmoji(selectedMethod)} ${selectedMethod} • Demo User`;
+  document.getElementById('guruRequestDetails').textContent = consultationDetails();
+}
+
+function switchRole(){
+  role=role==='user'?'guru':'user';
+  render();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function showNotice(message, type=''){
+  const n=document.getElementById('appNotice');
+  n.textContent=message;
+  n.className='note'+(type?' '+type:'');
+  n.classList.remove('hidden');
+  clearTimeout(window.__noticeTimer);
+  window.__noticeTimer=setTimeout(()=>n.classList.add('hidden'),4200);
+}
+
+function methodEmoji(m){
+  return m==='कुंडली'?'🔮':m==='सामुद्रिक शास्त्र'?'🕉️':'✋';
+}
+function selectMethod(method){
+  selectedMethod=method;
+  document.getElementById('methodKundli').classList.toggle('active',method==='कुंडली');
+  document.getElementById('methodSamudrik').classList.toggle('active',method==='सामुद्रिक शास्त्र');
+  document.getElementById('methodPalm').classList.toggle('active',method==='हस्तरेखा');
+  document.getElementById('kundliFields').classList.toggle('hidden',method!=='कुंडली');
+  document.getElementById('methodNote').textContent='चयन: '+methodEmoji(method)+' '+method;
+}
+function consultationDetails(){
+  if(selectedMethod==='कुंडली'){
+    const dob=document.getElementById('dob').value || 'DOB नहीं भरी';
+    const time=document.getElementById('birthTime').value || 'समय नहीं भरा';
+    const place=document.getElementById('birthPlace').value.trim() || 'स्थान नहीं भरा';
+    return `DOB: ${dob} • समय: ${time} • स्थान: ${place}`;
+  }
+  if(selectedMethod==='सामुद्रिक शास्त्र') return 'Live Face Reading / Samudrik consultation request';
+  return 'हस्तरेखा consultation request';
+}
+function sendConsultationRequest(){
+  if(selectedMethod==='कुंडली'){
+    const dob=document.getElementById('dob').value;
+    const time=document.getElementById('birthTime').value;
+    const place=document.getElementById('birthPlace').value.trim();
+    if(!dob || !time || !place){
+      showNotice('⚠️ कुंडली के लिए DOB, जन्म समय और जन्म स्थान भरें।','warn');
+      return;
+    }
+  }
+  consultationRequested=true;
+  consultationAccepted=false;
+  videoRequested=false;
+  videoAccepted=false;
+  render();
+  showNotice(`🙏 ${selectedMethod} consultation request Guruji को भेज दी गई है।`,'success');
+}
+function acceptConsultation(){
+  if(!consultationRequested) return;
+  consultationAccepted=true;
+  render();
+  showNotice(`✅ ${selectedMethod} consultation स्वीकार हो गई। अब User mode में Chat और Video Call उपलब्ध हैं।`,'success');
+}
+function requestVideo(){
+  if(!consultationAccepted){
+    showNotice('🟡 पहले consultation request को Guruji से accept करवाएँ।','warn');
+    return;
+  }
+  videoRequested=true; videoAccepted=true; render();
+  showNotice('📹 Video Call ready है। User और Guruji दोनों तरफ Video खोल सकते हैं।','success');
+}
+function acceptVideo(){
+  acceptConsultation();
+}
+
+function sendUser(){
+  const i=document.getElementById('userInput');
+  if(!i.value.trim()) return;
+  const d=document.createElement('div'); d.className='msg user'; d.textContent=i.value;
+  document.getElementById('chat').appendChild(d); i.value='';
+}
+
+function sendGuru(){
+  const i=document.getElementById('guruInput');
+  if(!i.value.trim()) return;
+  const d=document.createElement('div'); d.className='msg'; d.textContent=i.value;
+  document.getElementById('guruChat').appendChild(d); i.value='';
+}
+
+function openVideo(from){
+  if(!consultationAccepted){
+    showNotice('🟡 पहले consultation को Guruji से accept करवाएँ।','warn'); return;
+  }
+  videoRequested=true; videoAccepted=true; render();
+  document.getElementById('videoTitle').textContent =
+    from==='guru'?'📹 User के साथ Video Consultation':'📹 Guruji के साथ Video Consultation';
+  document.getElementById('videoPerson').textContent=from==='guru'?'Demo User':'Guruji';
+  document.getElementById('videoStatus').textContent='🟢 Video session ready';
+  document.getElementById('videoModal').style.display='flex';
+}
+function closeVideo(){document.getElementById('videoModal').style.display='none';}
+let cameraStream=null;
+let micOn=false;
+
+async function toggleCamera(){
+  const video=document.getElementById('localVideo');
+  const status=document.getElementById('cameraStatus');
+  const btn=document.getElementById('cameraBtn');
+
+  if(cameraStream){
+    cameraStream.getVideoTracks().forEach(t=>t.enabled=!t.enabled);
+    const on=cameraStream.getVideoTracks().some(t=>t.enabled);
+    btn.textContent=on?'📹 Camera बंद करें':'📹 Camera शुरू करें';
+    status.textContent=on?'🟢 Camera चालू है।':'⚪ Camera बंद है।';
+    return;
+  }
+
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    status.textContent='⚠️ Camera के लिए यह page HTTPS (secure web address) पर खोलना जरूरी है। Downloaded content:// file में Android camera permission नहीं देता।';
+    return;
+  }
+
+  try{
+    cameraStream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+    video.srcObject=cameraStream;
+    video.style.display='block';
+    document.getElementById('videoPlaceholder').style.display='none';
+    btn.textContent='📹 Camera बंद करें';
+    status.textContent='🟢 Camera चालू है।';
+  }catch(e){
+    status.textContent='⚠️ Camera permission नहीं मिली। HTTPS page की Browser Site Settings में Camera → Allow करें, फिर दोबारा दबाएँ।';
+    console.error(e);
+  }
+}
+
+async function toggleMic(){
+  const status=document.getElementById('cameraStatus');
+  if(!cameraStream){
+    try{
+      cameraStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+      document.getElementById('localVideo').srcObject=cameraStream;
+      document.getElementById('localVideo').style.display='block';
+      document.getElementById('videoPlaceholder').style.display='none';
+      micOn=true;
+    }catch(e){
+      status.textContent='⚠️ Mic/Camera permission नहीं मिली। Browser में Allow करें।';
+      return;
+    }
+  }else{
+    let tracks=cameraStream.getAudioTracks();
+    if(!tracks.length){
+      try{
+        const audio=await navigator.mediaDevices.getUserMedia({audio:true});
+        audio.getAudioTracks().forEach(t=>cameraStream.addTrack(t));
+        tracks=cameraStream.getAudioTracks();
+      }catch(e){
+        status.textContent='⚠️ Microphone permission नहीं मिली।';
+        return;
+      }
+    }
+    micOn=!micOn;
+    tracks.forEach(t=>t.enabled=micOn);
+  }
+  document.getElementById('micBtn').textContent=micOn?'🎙️ Mic बंद करें':'🎙️ Mic चालू करें';
+}
+
+function endCall(){
+  if(cameraStream){
+    cameraStream.getTracks().forEach(t=>t.stop());
+    cameraStream=null;
+  }
+  document.getElementById('localVideo').srcObject=null;
+  document.getElementById('localVideo').style.display='none';
+  document.getElementById('videoPlaceholder').style.display='block';
+  document.getElementById('cameraBtn').textContent='📹 Camera शुरू करें';
+  document.getElementById('micBtn').textContent='🎙️ Mic चालू करें';
+  document.getElementById('cameraStatus').textContent='Camera अभी बंद है। Camera दबाकर शुरू करें।';
+  closeVideo();
+}
+['userInput','guruInput'].forEach(id=>{
+  document.getElementById(id).addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault(); id==='userInput'?sendUser():sendGuru();}
+  });
+});
+render();
+window.addEventListener('pagehide',()=>{
+  if(cameraStream) cameraStream.getTracks().forEach(t=>t.stop());
+});
+(function(){
+  const h=document.getElementById('secureHint');
+  if(h){
+    if(window.isSecureContext){
+      h.textContent='🔒 Secure context: Camera API उपलब्ध है।';
+    }else{
+      h.textContent='⚠️ अभी local content:// file है। Actual camera के लिए HTTPS URL चाहिए।';
+    }
+  }
+})();
+</script>
+</body>
+</html>
