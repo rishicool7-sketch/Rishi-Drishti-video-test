@@ -67,10 +67,10 @@ button{border:0;border-radius:14px;padding:13px 18px;font-size:16px;font-weight:
       <button class="orange" style="width:100%" onclick="sendConsultationRequest()">🙏 Consultation Request भेजें</button>
     </div>
 
-    <div class="card">
+    <div class="card" id="userVideoCard">
       <h2>📹 Video Consultation</h2>
-      <p id="userVideoState">अभी कोई active video consultation नहीं है।</p>
-      <button class="orange" style="width:100%" onclick="requestVideo()">📹 Video Call Request भेजें</button>
+      <p id="userVideoState">अभी कोई consultation request नहीं है।</p>
+      <button class="orange hidden" id="userVideoRequestBtn" style="width:100%" onclick="sendVideoCallRequest()">📹 Video Call Request भेजें</button>
     </div>
     <div class="card hidden" id="userActive">
       <h2>📹 Active Video Consultation</h2>
@@ -147,25 +147,44 @@ button{border:0;border-radius:14px;padding:13px 18px;font-size:16px;font-weight:
 const firebaseConfig={apiKey:"AIzaSyDHoQc1bVd2IZJg3NDVLBnGsnO7WgxReGE",authDomain:"rishi-drishti.firebaseapp.com",projectId:"rishi-drishti",storageBucket:"rishi-drishti.firebasestorage.app",messagingSenderId:"1093911608268",appId:"1:1093911608268:web:bcbc873811eb8241747b69",databaseURL:"https://rishi-drishti-default-rtdb.firebaseio.com"};
 firebase.initializeApp(firebaseConfig);
 const db=firebase.database();
-let role=localStorage.getItem('rd_role')||'user',selectedMethod='कुंडली',consultationRequested=false,consultationAccepted=false,currentRequestId=localStorage.getItem('rd_request_id'),currentCallId=null,cameraStream=null,micOn=false,pc=null,unsubRequest=null,unsubSignals=[];
+let role=localStorage.getItem('rd_role')||'user',selectedMethod=localStorage.getItem('rd_request_method')||'कुंडली',consultationRequested=false,consultationAccepted=false,currentRequestId=localStorage.getItem('rd_request_id'),currentCallId=null,cameraStream=null,micOn=false,pc=null,unsubRequest=null,unsubSignals=[];
 const rtcConfig={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
 
 function render(){
  document.getElementById('userView').classList.toggle('hidden',role!=='user');
  document.getElementById('guruView').classList.toggle('hidden',role!=='guru');
  document.getElementById('roleLabel').textContent=role==='user'?'👤 User':'🧘 Guruji';
+
  const pending=role==='guru'&&consultationRequested&&!consultationAccepted;
  document.getElementById('guruRequest').classList.toggle('hidden',!pending);
  document.getElementById('guruNoRequest').classList.toggle('hidden',pending);
- document.getElementById('userActive').classList.toggle('hidden',role!=='user'||!consultationRequested);
- if(consultationRequested){
-  document.getElementById('userActiveState').textContent=consultationAccepted?'🟢 Guruji ने consultation स्वीकार कर ली है। अब Video Call उपलब्ध है।':'🟡 Guruji के Accept करने का इंतज़ार...';
-  const b=document.getElementById('userVideoBtn'); b.disabled=!consultationAccepted; b.style.opacity=consultationAccepted?'1':'.55';
-  document.getElementById('userVideoState').textContent=consultationAccepted?`🟢 ${selectedMethod} consultation active है।`:`🟡 ${selectedMethod} request pending है।`;
+
+ const hasRequest=role==='user'&&consultationRequested;
+ document.getElementById('userActive').classList.toggle('hidden',!hasRequest);
+
+ if(role==='user'){
+   const label=`${methodEmoji(selectedMethod)} ${selectedMethod}`;
+   if(!hasRequest){
+     document.getElementById('userVideoState').textContent='अभी कोई consultation request नहीं है।';
+     document.getElementById('userVideoRequestBtn').classList.add('hidden');
+   }else if(consultationAccepted){
+     document.getElementById('userVideoState').textContent=`🟢 ${label} accepted है। Video Call अब उपलब्ध है।`;
+     document.getElementById('userActiveState').textContent=`🟢 Guruji ने ${label} consultation स्वीकार कर ली है।`;
+     document.getElementById('userVideoBtn').disabled=false;
+     document.getElementById('userVideoBtn').style.opacity='1';
+     document.getElementById('userVideoRequestBtn').classList.add('hidden');
+   }else{
+     document.getElementById('userVideoState').textContent=`🟡 ${label} request Guruji के Accept करने का इंतज़ार कर रही है।`;
+     document.getElementById('userActiveState').textContent=`🟡 ${label} request pending है — Guruji के Accept करने के बाद notification आएगा।`;
+     document.getElementById('userVideoBtn').disabled=true;
+     document.getElementById('userVideoBtn').style.opacity='.55';
+     document.getElementById('userVideoRequestBtn').classList.add('hidden');
+   }
  }
  document.getElementById('guruRequestTitle').textContent=`${methodEmoji(selectedMethod)} ${selectedMethod} • Demo User`;
  document.getElementById('guruRequestDetails').textContent=consultationDetails();
 }
+
 async function startFreshSession(){
   try{
     if(currentRequestId){
@@ -181,6 +200,7 @@ async function startFreshSession(){
   consultationRequested=false;
   consultationAccepted=false;
   localStorage.removeItem('rd_request_id');
+  localStorage.removeItem('rd_request_method');
   cleanupListeners();
   attachFirebaseListeners();
   render();
@@ -193,21 +213,100 @@ function methodEmoji(m){return m==='कुंडली'?'🔮':m==='सामु
 function selectMethod(method){selectedMethod=method;document.getElementById('methodKundli').classList.toggle('active',method==='कुंडली');document.getElementById('methodSamudrik').classList.toggle('active',method==='सामुद्रिक शास्त्र');document.getElementById('methodPalm').classList.toggle('active',method==='हस्तरेखा');document.getElementById('kundliFields').classList.toggle('hidden',method!=='कुंडली');document.getElementById('methodNote').textContent='चयन: '+methodEmoji(method)+' '+method}
 function consultationDetails(){if(selectedMethod==='कुंडली'){const dob=document.getElementById('dob').value||'DOB नहीं भरी',time=document.getElementById('birthTime').value||'समय नहीं भरा',place=document.getElementById('birthPlace').value.trim()||'स्थान नहीं भरा';return `DOB: ${dob} • समय: ${time} • स्थान: ${place}`}if(selectedMethod==='सामुद्रिक शास्त्र')return'Live Face Reading / Samudrik consultation request';return'हस्तरेखा consultation request'}
 
+async function enableBrowserNotifications(){
+ if(!('Notification' in window)){
+   showNotice('ℹ️ इस browser में notification support उपलब्ध नहीं है।','warn');
+   return false;
+ }
+ if(Notification.permission==='granted') return true;
+ if(Notification.permission==='denied'){
+   showNotice('⚠️ Browser settings में Notifications Allow करें।','warn');
+   return false;
+ }
+ try{
+   const p=await Notification.requestPermission();
+   if(p==='granted'){
+     showNotice('🔔 Notifications चालू हैं।','success');
+     return true;
+   }
+ }catch(e){console.warn(e)}
+ return false;
+}
+
+function notifyUserAccepted(method){
+ const title='Rishi Drishti • Request Accepted';
+ const body=`Guruji ने ${methodEmoji(method)} ${method} consultation स्वीकार कर ली है। Video Call अब उपलब्ध है।`;
+ showNotice('🟢 '+body,'success');
+ if('Notification' in window && Notification.permission==='granted'){
+   try{
+     new Notification(title,{body,icon:'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/firebase-logo.png'});
+   }catch(e){console.warn(e)}
+ }
+ if(navigator.vibrate) try{navigator.vibrate([250,120,250])}catch(_){}
+}
+
+async function sendVideoCallRequest(){
+ if(!consultationAccepted){
+   showNotice('🟡 पहले consultation को Guruji से accept करवाएँ।','warn');
+   return;
+ }
+ try{
+   await enableBrowserNotifications();
+   await db.ref('videoCalls/'+currentRequestId).update({
+     request:'video',
+     videoRequestStatus:'requested',
+     requestedAt:firebase.database.ServerValue.TIMESTAMP
+   });
+   showNotice('📹 Video Call request भेज दी गई। अब Guruji Video Call खोल सकते हैं।','success');
+ }catch(e){
+   console.error(e);
+   showNotice('❌ Video Call request नहीं भेजी गई।','warn');
+ }
+}
+
 async function sendConsultationRequest(){
  if(selectedMethod==='कुंडली'&&!document.getElementById('dob').value){showNotice('⚠️ कुंडली के लिए DOB भरें।','warn');return}
  if(selectedMethod==='कुंडली'&&(!document.getElementById('birthTime').value||!document.getElementById('birthPlace').value.trim())){showNotice('⚠️ कुंडली के लिए जन्म समय और स्थान भी भरें।','warn');return}
  try{
-  const ref=db.ref('consultationRequests').push();currentRequestId=ref.key;
-  await ref.set({id:currentRequestId,method:selectedMethod,details:consultationDetails(),status:'pending',createdAt:firebase.database.ServerValue.TIMESTAMP});
-  localStorage.setItem('rd_request_id',currentRequestId);consultationRequested=true;consultationAccepted=false;render();
-  showNotice(`🙏 ${selectedMethod} consultation request Guruji को भेज दी गई है।`,'success');
+  await enableBrowserNotifications();
+  const ref=db.ref('consultationRequests').push();
+  currentRequestId=ref.key;
+  const requestData={
+    id:currentRequestId,
+    method:selectedMethod,
+    details:consultationDetails(),
+    status:'pending',
+    createdAt:firebase.database.ServerValue.TIMESTAMP
+  };
+  await ref.set(requestData);
+  localStorage.setItem('rd_request_id',currentRequestId);
+  localStorage.setItem('rd_request_method',selectedMethod);
+  consultationRequested=true;
+  consultationAccepted=false;
+  currentCallId=null;
+  render();
+  showNotice(`🙏 ${methodEmoji(selectedMethod)} ${selectedMethod} consultation request Guruji को भेज दी गई है।`,'success');
  }catch(e){console.error(e);showNotice('❌ Firebase request नहीं भेजी गई।','warn')}
 }
+
 async function acceptConsultation(){
  if(!currentRequestId)return;
- try{await db.ref('consultationRequests/'+currentRequestId).update({status:'accepted',acceptedAt:firebase.database.ServerValue.TIMESTAMP,callId:currentRequestId});consultationAccepted=true;currentCallId=currentRequestId;render();showNotice('✅ Request स्वीकार हो गई। User को notification मिल जाएगी।','success')}
- catch(e){console.error(e);showNotice('❌ Request accept नहीं हो सकी।','warn')}
+ try{
+   const method=selectedMethod;
+   await db.ref('consultationRequests/'+currentRequestId).update({
+     status:'accepted',
+     acceptedAt:firebase.database.ServerValue.TIMESTAMP,
+     callId:currentRequestId
+   });
+   currentCallId=currentRequestId;
+   consultationAccepted=true;
+   consultationRequested=true;
+   render();
+   showNotice(`✅ ${methodEmoji(method)} ${method} request स्वीकार हो गई। User को live notification भेजी जा रही है।`,'success');
+ }catch(e){console.error(e);showNotice('❌ Request accept नहीं हो सकी।','warn')}
 }
+function requestVideo(){sendVideoCallRequest()}
+
 function requestVideo(){if(!consultationAccepted){showNotice('🟡 पहले consultation request को Guruji से accept करवाएँ।','warn');return}openVideo('user')}
 function acceptVideo(){acceptConsultation()}
 function sendUser(){const i=document.getElementById('userInput');if(!i.value.trim())return;const d=document.createElement('div');d.className='msg user';d.textContent=i.value;document.getElementById('chat').appendChild(d);i.value=''}
@@ -253,13 +352,62 @@ function cleanupListeners(){if(unsubRequest)unsubRequest();unsubRequest=null}
 function attachFirebaseListeners(){
  cleanupListeners();
  if(role==='user'&&currentRequestId){
-  const ref=db.ref('consultationRequests/'+currentRequestId),h=ref.on('value',s=>{const d=s.val();if(!d)return;consultationRequested=true;selectedMethod=d.method||selectedMethod;consultationAccepted=d.status==='accepted';currentCallId=d.callId||currentRequestId;render();if(consultationAccepted)showNotice('🟢 Guruji ने आपकी request स्वीकार कर ली है।','success')});unsubRequest=()=>ref.off('value',h)
+  const ref=db.ref('consultationRequests/'+currentRequestId);
+  const h=ref.on('value',s=>{
+    const d=s.val();
+    if(!d){
+      currentRequestId=null; currentCallId=null; consultationRequested=false; consultationAccepted=false;
+      localStorage.removeItem('rd_request_id');
+      render();
+      return;
+    }
+    const previousAccepted=consultationAccepted;
+    consultationRequested=d.status!=='closed';
+    selectedMethod=d.method||localStorage.getItem('rd_request_method')||selectedMethod;
+    consultationAccepted=d.status==='accepted';
+    currentCallId=d.callId||currentRequestId;
+
+    render();
+
+    if(consultationAccepted && !previousAccepted){
+      notifyUserAccepted(selectedMethod);
+    }
+    if(d.status==='closed'){
+      consultationRequested=false;
+      consultationAccepted=false;
+      render();
+    }
+  });
+  unsubRequest=()=>ref.off('value',h);
  }else if(role==='guru'){
-  const ref=db.ref('consultationRequests'),h=ref.on('value',s=>{let latest=null;s.forEach(c=>{const d=c.val();if(d&&d.status==='pending'&&(!latest||(d.createdAt||0)>(latest.createdAt||0)))latest=d});if(latest){currentRequestId=latest.id;currentCallId=latest.callId||latest.id;selectedMethod=latest.method||'कुंडली';consultationRequested=true;consultationAccepted=false}else{consultationRequested=false}render()});unsubRequest=()=>ref.off('value',h)
+  const ref=db.ref('consultationRequests');
+  const h=ref.on('value',s=>{
+    let latest=null;
+    s.forEach(c=>{
+      const d=c.val();
+      if(d&&d.status==='pending'&&(!latest||(d.createdAt||0)>(latest.createdAt||0)))latest=d;
+    });
+    if(latest){
+      currentRequestId=latest.id;
+      currentCallId=latest.callId||latest.id;
+      selectedMethod=latest.method||'कुंडली';
+      consultationRequested=true;
+      consultationAccepted=false;
+    }else{
+      consultationRequested=false;
+      consultationAccepted=false;
+      currentRequestId=null;
+      currentCallId=null;
+    }
+    render();
+  });
+  unsubRequest=()=>ref.off('value',h);
  }
 }
+
 ['userInput','guruInput'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();id==='userInput'?sendUser():sendGuru()}}));
 render();attachFirebaseListeners();
+if(role==='user'&&'Notification' in window&&Notification.permission!=='granted'){document.getElementById('notificationHint').textContent='🔔 User phone पर Guruji acceptance notification पाने के लिए Notifications Allow करें।';document.getElementById('notificationHint').classList.remove('hidden');}
 window.addEventListener('pagehide',()=>{if(cameraStream)cameraStream.getTracks().forEach(t=>t.stop())});
 </script>
 </body>
