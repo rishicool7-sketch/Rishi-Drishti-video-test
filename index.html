@@ -137,226 +137,105 @@ button{border:0;border-radius:14px;padding:13px 18px;font-size:16px;font-weight:
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
-let role='user', videoRequested=false, videoAccepted=false, consultationRequested=false, consultationAccepted=false, selectedMethod='कुंडली';
+const firebaseConfig={apiKey:"AIzaSyDHoQc1bVd2IZJg3NDVLBnGsnO7WgxReGE",authDomain:"rishi-drishti.firebaseapp.com",projectId:"rishi-drishti",storageBucket:"rishi-drishti.firebasestorage.app",messagingSenderId:"1093911608268",appId:"1:1093911608268:web:bcbc873811eb8241747b69",databaseURL:"https://rishi-drishti-default-rtdb.firebaseio.com"};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+let role=localStorage.getItem('rd_role')||'user',selectedMethod='कुंडली',consultationRequested=false,consultationAccepted=false,currentRequestId=localStorage.getItem('rd_request_id'),currentCallId=null,cameraStream=null,micOn=false,pc=null,unsubRequest=null,unsubSignals=[];
+const rtcConfig={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
 
 function render(){
-  document.getElementById('userView').classList.toggle('hidden', role!=='user');
-  document.getElementById('guruView').classList.toggle('hidden', role!=='guru');
-  document.getElementById('roleLabel').textContent=role==='user'?'👤 User':'🧘 Guruji';
+ document.getElementById('userView').classList.toggle('hidden',role!=='user');
+ document.getElementById('guruView').classList.toggle('hidden',role!=='guru');
+ document.getElementById('roleLabel').textContent=role==='user'?'👤 User':'🧘 Guruji';
+ const pending=role==='guru'&&consultationRequested&&!consultationAccepted;
+ document.getElementById('guruRequest').classList.toggle('hidden',!pending);
+ document.getElementById('guruNoRequest').classList.toggle('hidden',pending);
+ document.getElementById('userActive').classList.toggle('hidden',role!=='user'||!consultationRequested);
+ if(consultationRequested){
+  document.getElementById('userActiveState').textContent=consultationAccepted?'🟢 Guruji ने consultation स्वीकार कर ली है। अब Video Call उपलब्ध है।':'🟡 Guruji के Accept करने का इंतज़ार...';
+  const b=document.getElementById('userVideoBtn'); b.disabled=!consultationAccepted; b.style.opacity=consultationAccepted?'1':'.55';
+  document.getElementById('userVideoState').textContent=consultationAccepted?`🟢 ${selectedMethod} consultation active है।`:`🟡 ${selectedMethod} request pending है।`;
+ }
+ document.getElementById('guruRequestTitle').textContent=`${methodEmoji(selectedMethod)} ${selectedMethod} • Demo User`;
+ document.getElementById('guruRequestDetails').textContent=consultationDetails();
+}
+function switchRole(){role=role==='user'?'guru':'user';localStorage.setItem('rd_role',role);cleanupListeners();attachFirebaseListeners();render();window.scrollTo({top:0,behavior:'smooth'});showNotice(role==='guru'?'🧘 Guruji mode चालू है।':'👤 User mode चालू है।','success')}
+function showNotice(message,type=''){const n=document.getElementById('appNotice');n.textContent=message;n.className='note'+(type?' '+type:'');n.classList.remove('hidden');clearTimeout(window.__noticeTimer);window.__noticeTimer=setTimeout(()=>n.classList.add('hidden'),4500)}
+function methodEmoji(m){return m==='कुंडली'?'🔮':m==='सामुद्रिक शास्त्र'?'🕉️':'✋'}
+function selectMethod(method){selectedMethod=method;document.getElementById('methodKundli').classList.toggle('active',method==='कुंडली');document.getElementById('methodSamudrik').classList.toggle('active',method==='सामुद्रिक शास्त्र');document.getElementById('methodPalm').classList.toggle('active',method==='हस्तरेखा');document.getElementById('kundliFields').classList.toggle('hidden',method!=='कुंडली');document.getElementById('methodNote').textContent='चयन: '+methodEmoji(method)+' '+method}
+function consultationDetails(){if(selectedMethod==='कुंडली'){const dob=document.getElementById('dob').value||'DOB नहीं भरी',time=document.getElementById('birthTime').value||'समय नहीं भरा',place=document.getElementById('birthPlace').value.trim()||'स्थान नहीं भरा';return `DOB: ${dob} • समय: ${time} • स्थान: ${place}`}if(selectedMethod==='सामुद्रिक शास्त्र')return'Live Face Reading / Samudrik consultation request';return'हस्तरेखा consultation request'}
 
-  document.getElementById('guruRequest').classList.toggle('hidden', !consultationRequested || consultationAccepted);
-  document.getElementById('guruNoRequest').classList.toggle('hidden', consultationRequested && !consultationAccepted);
-
-  document.getElementById('userActive').classList.toggle('hidden', !consultationRequested);
-  if(consultationRequested){
-    document.getElementById('userActiveState').textContent =
-      consultationAccepted ? '🟢 Guruji ने consultation स्वीकार कर ली है। अब Chat और Video Call उपलब्ध हैं।' :
-      '🟡 Guruji के Accept करने का इंतज़ार...';
-    const b=document.getElementById('userVideoBtn');
-    b.disabled=!consultationAccepted;
-    b.style.opacity=consultationAccepted?'1':'.55';
-    document.getElementById('userVideoState').textContent =
-      consultationAccepted ? `🟢 ${selectedMethod} consultation active है।` : `🟡 ${selectedMethod} request pending है।`;
-  }
-  document.getElementById('guruRequestTitle').textContent = `${methodEmoji(selectedMethod)} ${selectedMethod} • Demo User`;
-  document.getElementById('guruRequestDetails').textContent = consultationDetails();
-}
-
-function switchRole(){
-  role=role==='user'?'guru':'user';
-  render();
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-
-function showNotice(message, type=''){
-  const n=document.getElementById('appNotice');
-  n.textContent=message;
-  n.className='note'+(type?' '+type:'');
-  n.classList.remove('hidden');
-  clearTimeout(window.__noticeTimer);
-  window.__noticeTimer=setTimeout(()=>n.classList.add('hidden'),4200);
-}
-
-function methodEmoji(m){
-  return m==='कुंडली'?'🔮':m==='सामुद्रिक शास्त्र'?'🕉️':'✋';
-}
-function selectMethod(method){
-  selectedMethod=method;
-  document.getElementById('methodKundli').classList.toggle('active',method==='कुंडली');
-  document.getElementById('methodSamudrik').classList.toggle('active',method==='सामुद्रिक शास्त्र');
-  document.getElementById('methodPalm').classList.toggle('active',method==='हस्तरेखा');
-  document.getElementById('kundliFields').classList.toggle('hidden',method!=='कुंडली');
-  document.getElementById('methodNote').textContent='चयन: '+methodEmoji(method)+' '+method;
-}
-function consultationDetails(){
-  if(selectedMethod==='कुंडली'){
-    const dob=document.getElementById('dob').value || 'DOB नहीं भरी';
-    const time=document.getElementById('birthTime').value || 'समय नहीं भरा';
-    const place=document.getElementById('birthPlace').value.trim() || 'स्थान नहीं भरा';
-    return `DOB: ${dob} • समय: ${time} • स्थान: ${place}`;
-  }
-  if(selectedMethod==='सामुद्रिक शास्त्र') return 'Live Face Reading / Samudrik consultation request';
-  return 'हस्तरेखा consultation request';
-}
-function sendConsultationRequest(){
-  if(selectedMethod==='कुंडली'){
-    const dob=document.getElementById('dob').value;
-    const time=document.getElementById('birthTime').value;
-    const place=document.getElementById('birthPlace').value.trim();
-    if(!dob || !time || !place){
-      showNotice('⚠️ कुंडली के लिए DOB, जन्म समय और जन्म स्थान भरें।','warn');
-      return;
-    }
-  }
-  consultationRequested=true;
-  consultationAccepted=false;
-  videoRequested=false;
-  videoAccepted=false;
-  render();
+async function sendConsultationRequest(){
+ if(selectedMethod==='कुंडली'&&!document.getElementById('dob').value){showNotice('⚠️ कुंडली के लिए DOB भरें।','warn');return}
+ if(selectedMethod==='कुंडली'&&(!document.getElementById('birthTime').value||!document.getElementById('birthPlace').value.trim())){showNotice('⚠️ कुंडली के लिए जन्म समय और स्थान भी भरें।','warn');return}
+ try{
+  const ref=db.ref('consultationRequests').push();currentRequestId=ref.key;
+  await ref.set({id:currentRequestId,method:selectedMethod,details:consultationDetails(),status:'pending',createdAt:firebase.database.ServerValue.TIMESTAMP});
+  localStorage.setItem('rd_request_id',currentRequestId);consultationRequested=true;consultationAccepted=false;render();
   showNotice(`🙏 ${selectedMethod} consultation request Guruji को भेज दी गई है।`,'success');
+ }catch(e){console.error(e);showNotice('❌ Firebase request नहीं भेजी गई।','warn')}
 }
-function acceptConsultation(){
-  if(!consultationRequested) return;
-  consultationAccepted=true;
-  render();
-  showNotice(`✅ ${selectedMethod} consultation स्वीकार हो गई। अब User mode में Chat और Video Call उपलब्ध हैं।`,'success');
+async function acceptConsultation(){
+ if(!currentRequestId)return;
+ try{await db.ref('consultationRequests/'+currentRequestId).update({status:'accepted',acceptedAt:firebase.database.ServerValue.TIMESTAMP,callId:currentRequestId});consultationAccepted=true;currentCallId=currentRequestId;render();showNotice('✅ Request स्वीकार हो गई। User को notification मिल जाएगी।','success')}
+ catch(e){console.error(e);showNotice('❌ Request accept नहीं हो सकी।','warn')}
 }
-function requestVideo(){
-  if(!consultationAccepted){
-    showNotice('🟡 पहले consultation request को Guruji से accept करवाएँ।','warn');
-    return;
-  }
-  videoRequested=true; videoAccepted=true; render();
-  showNotice('📹 Video Call ready है। User और Guruji दोनों तरफ Video खोल सकते हैं।','success');
-}
-function acceptVideo(){
-  acceptConsultation();
-}
+function requestVideo(){if(!consultationAccepted){showNotice('🟡 पहले consultation request को Guruji से accept करवाएँ।','warn');return}openVideo('user')}
+function acceptVideo(){acceptConsultation()}
+function sendUser(){const i=document.getElementById('userInput');if(!i.value.trim())return;const d=document.createElement('div');d.className='msg user';d.textContent=i.value;document.getElementById('chat').appendChild(d);i.value=''}
+function sendGuru(){const i=document.getElementById('guruInput');if(!i.value.trim())return;const d=document.createElement('div');d.className='msg';d.textContent=i.value;document.getElementById('guruChat').appendChild(d);i.value=''}
 
-function sendUser(){
-  const i=document.getElementById('userInput');
-  if(!i.value.trim()) return;
-  const d=document.createElement('div'); d.className='msg user'; d.textContent=i.value;
-  document.getElementById('chat').appendChild(d); i.value='';
+async function openVideo(from){
+ if(!consultationAccepted){showNotice('🟡 पहले consultation को Guruji से accept करवाएँ।','warn');return}
+ currentCallId=currentCallId||currentRequestId;
+ document.getElementById('videoTitle').textContent=from==='guru'?'📹 User के साथ Video Consultation':'📹 Guruji के साथ Video Consultation';
+ document.getElementById('videoPerson').textContent=from==='guru'?'Demo User':'Guruji';
+ document.getElementById('videoStatus').textContent='🟡 Video connection तैयार किया जा रहा है...';
+ document.getElementById('videoModal').style.display='flex';
+ document.getElementById('secureHint').textContent=window.isSecureContext?'🔒 Secure HTTPS connection.':'⚠️ HTTPS जरूरी है।';
+ try{await setupWebRTC(from)}catch(e){console.error(e);document.getElementById('videoStatus').textContent='⚠️ Video connection शुरू नहीं हो सका।'}
 }
+function closeVideo(){document.getElementById('videoModal').style.display='none'}
+function ensureRemoteVideo(){if(document.getElementById('remoteVideo'))return;const v=document.createElement('video');v.id='remoteVideo';v.autoplay=true;v.playsInline=true;v.style.cssText='width:100%;max-height:360px;object-fit:cover;border-radius:18px;background:#111;margin-top:10px;display:none';const l=document.getElementById('localVideo');l.parentNode.insertBefore(v,l.nextSibling)}
+async function getLocalMedia(){if(cameraStream)return cameraStream;if(!navigator.mediaDevices?.getUserMedia)throw Error('Camera API unavailable');cameraStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});const v=document.getElementById('localVideo');v.srcObject=cameraStream;v.style.display='block';document.getElementById('videoPlaceholder').style.display='none';micOn=true;document.getElementById('cameraBtn').textContent='📹 Camera बंद करें';document.getElementById('micBtn').textContent='🎙️ Mic बंद करें';document.getElementById('cameraStatus').textContent='🟢 Camera और Mic चालू हैं।';return cameraStream}
 
-function sendGuru(){
-  const i=document.getElementById('guruInput');
-  if(!i.value.trim()) return;
-  const d=document.createElement('div'); d.className='msg'; d.textContent=i.value;
-  document.getElementById('guruChat').appendChild(d); i.value='';
+async function setupWebRTC(from){
+ await getLocalMedia();ensureRemoteVideo();
+ const callRef=db.ref('videoCalls/'+currentCallId);
+ if(pc)try{pc.close()}catch(_){}
+ pc=new RTCPeerConnection(rtcConfig);
+ cameraStream.getTracks().forEach(t=>pc.addTrack(t,cameraStream));
+ pc.ontrack=e=>{const v=document.getElementById('remoteVideo');v.srcObject=e.streams[0];v.style.display='block';document.getElementById('videoStatus').textContent='🟢 दोनों तरफ Video Connected'};
+ pc.onicecandidate=e=>{if(e.candidate)callRef.child(from==='user'?'userCandidates':'guruCandidates').push(e.candidate.toJSON())};
+ watchCandidates(callRef,from==='user'?'guruCandidates':'userCandidates');
+ if(from==='user'){
+  const offer=await pc.createOffer();await pc.setLocalDescription(offer);await callRef.update({offer:{type:offer.type,sdp:offer.sdp},status:'offer-created'});
+  const handler=callRef.child('answer').on('value',async s=>{if(s.exists()&&!pc.currentRemoteDescription)await pc.setRemoteDescription(new RTCSessionDescription(s.val()))});unsubSignals.push(()=>callRef.child('answer').off('value',handler));
+ }else{
+  const snap=await callRef.child('offer').once('value');
+  if(snap.exists())await createAnswer(callRef,snap.val());else{const h=callRef.child('offer').on('value',async s=>{if(s.exists()&&!pc.currentRemoteDescription)await createAnswer(callRef,s.val())});unsubSignals.push(()=>callRef.child('offer').off('value',h))}
+ }
 }
-
-function openVideo(from){
-  if(!consultationAccepted){
-    showNotice('🟡 पहले consultation को Guruji से accept करवाएँ।','warn'); return;
-  }
-  videoRequested=true; videoAccepted=true; render();
-  document.getElementById('videoTitle').textContent =
-    from==='guru'?'📹 User के साथ Video Consultation':'📹 Guruji के साथ Video Consultation';
-  document.getElementById('videoPerson').textContent=from==='guru'?'Demo User':'Guruji';
-  document.getElementById('videoStatus').textContent='🟢 Video session ready';
-  document.getElementById('videoModal').style.display='flex';
+async function createAnswer(callRef,offer){await pc.setRemoteDescription(new RTCSessionDescription(offer));const a=await pc.createAnswer();await pc.setLocalDescription(a);await callRef.update({answer:{type:a.type,sdp:a.sdp},status:'connected'});document.getElementById('videoStatus').textContent='🟢 Video connection accepted — connecting...'}
+function watchCandidates(callRef,branch){const r=callRef.child(branch),h=r.on('child_added',async s=>{try{if(pc)await pc.addIceCandidate(new RTCIceCandidate(s.val()))}catch(e){console.warn(e)}});unsubSignals.push(()=>r.off('child_added',h))}
+async function toggleCamera(){try{if(!cameraStream)await getLocalMedia();const ts=cameraStream.getVideoTracks(),on=!ts.some(t=>t.enabled);ts.forEach(t=>t.enabled=on);document.getElementById('cameraBtn').textContent=on?'📹 Camera बंद करें':'📹 Camera शुरू करें';document.getElementById('cameraStatus').textContent=on?'🟢 Camera चालू है।':'⚪ Camera बंद है。'}catch(e){document.getElementById('cameraStatus').textContent='⚠️ Camera permission नहीं मिली। HTTPS page में Camera → Allow करें।'}}
+async function toggleMic(){try{if(!cameraStream)await getLocalMedia();const ts=cameraStream.getAudioTracks();micOn=!micOn;ts.forEach(t=>t.enabled=micOn);document.getElementById('micBtn').textContent=micOn?'🎙️ Mic बंद करें':'🎙️ Mic चालू करें'}catch(e){document.getElementById('cameraStatus').textContent='⚠️ Microphone permission नहीं मिली।'}}
+function endCall(){if(cameraStream)cameraStream.getTracks().forEach(t=>t.stop());cameraStream=null;if(pc)try{pc.close()}catch(_){}pc=null;unsubSignals.forEach(f=>{try{f()}catch(_){}});unsubSignals=[];document.getElementById('localVideo').srcObject=null;document.getElementById('localVideo').style.display='none';const r=document.getElementById('remoteVideo');if(r){r.srcObject=null;r.style.display='none'}document.getElementById('videoPlaceholder').style.display='block';document.getElementById('cameraBtn').textContent='📹 Camera शुरू करें';document.getElementById('micBtn').textContent='🎙️ Mic चालू करें';closeVideo()}
+function cleanupListeners(){if(unsubRequest)unsubRequest();unsubRequest=null}
+function attachFirebaseListeners(){
+ cleanupListeners();
+ if(role==='user'&&currentRequestId){
+  const ref=db.ref('consultationRequests/'+currentRequestId),h=ref.on('value',s=>{const d=s.val();if(!d)return;consultationRequested=true;selectedMethod=d.method||selectedMethod;consultationAccepted=d.status==='accepted';currentCallId=d.callId||currentRequestId;render();if(consultationAccepted)showNotice('🟢 Guruji ने आपकी request स्वीकार कर ली है।','success')});unsubRequest=()=>ref.off('value',h)
+ }else if(role==='guru'){
+  const ref=db.ref('consultationRequests'),h=ref.on('value',s=>{let latest=null;s.forEach(c=>{const d=c.val();if(d&&d.status==='pending'&&(!latest||(d.createdAt||0)>(latest.createdAt||0)))latest=d});if(latest){currentRequestId=latest.id;currentCallId=latest.callId||latest.id;selectedMethod=latest.method||'कुंडली';consultationRequested=true;consultationAccepted=false}else{consultationRequested=false}render()});unsubRequest=()=>ref.off('value',h)
+ }
 }
-function closeVideo(){document.getElementById('videoModal').style.display='none';}
-let cameraStream=null;
-let micOn=false;
-
-async function toggleCamera(){
-  const video=document.getElementById('localVideo');
-  const status=document.getElementById('cameraStatus');
-  const btn=document.getElementById('cameraBtn');
-
-  if(cameraStream){
-    cameraStream.getVideoTracks().forEach(t=>t.enabled=!t.enabled);
-    const on=cameraStream.getVideoTracks().some(t=>t.enabled);
-    btn.textContent=on?'📹 Camera बंद करें':'📹 Camera शुरू करें';
-    status.textContent=on?'🟢 Camera चालू है।':'⚪ Camera बंद है।';
-    return;
-  }
-
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    status.textContent='⚠️ Camera के लिए यह page HTTPS (secure web address) पर खोलना जरूरी है। Downloaded content:// file में Android camera permission नहीं देता।';
-    return;
-  }
-
-  try{
-    cameraStream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
-    video.srcObject=cameraStream;
-    video.style.display='block';
-    document.getElementById('videoPlaceholder').style.display='none';
-    btn.textContent='📹 Camera बंद करें';
-    status.textContent='🟢 Camera चालू है।';
-  }catch(e){
-    status.textContent='⚠️ Camera permission नहीं मिली। HTTPS page की Browser Site Settings में Camera → Allow करें, फिर दोबारा दबाएँ।';
-    console.error(e);
-  }
-}
-
-async function toggleMic(){
-  const status=document.getElementById('cameraStatus');
-  if(!cameraStream){
-    try{
-      cameraStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-      document.getElementById('localVideo').srcObject=cameraStream;
-      document.getElementById('localVideo').style.display='block';
-      document.getElementById('videoPlaceholder').style.display='none';
-      micOn=true;
-    }catch(e){
-      status.textContent='⚠️ Mic/Camera permission नहीं मिली। Browser में Allow करें।';
-      return;
-    }
-  }else{
-    let tracks=cameraStream.getAudioTracks();
-    if(!tracks.length){
-      try{
-        const audio=await navigator.mediaDevices.getUserMedia({audio:true});
-        audio.getAudioTracks().forEach(t=>cameraStream.addTrack(t));
-        tracks=cameraStream.getAudioTracks();
-      }catch(e){
-        status.textContent='⚠️ Microphone permission नहीं मिली।';
-        return;
-      }
-    }
-    micOn=!micOn;
-    tracks.forEach(t=>t.enabled=micOn);
-  }
-  document.getElementById('micBtn').textContent=micOn?'🎙️ Mic बंद करें':'🎙️ Mic चालू करें';
-}
-
-function endCall(){
-  if(cameraStream){
-    cameraStream.getTracks().forEach(t=>t.stop());
-    cameraStream=null;
-  }
-  document.getElementById('localVideo').srcObject=null;
-  document.getElementById('localVideo').style.display='none';
-  document.getElementById('videoPlaceholder').style.display='block';
-  document.getElementById('cameraBtn').textContent='📹 Camera शुरू करें';
-  document.getElementById('micBtn').textContent='🎙️ Mic चालू करें';
-  document.getElementById('cameraStatus').textContent='Camera अभी बंद है। Camera दबाकर शुरू करें।';
-  closeVideo();
-}
-['userInput','guruInput'].forEach(id=>{
-  document.getElementById(id).addEventListener('keydown',e=>{
-    if(e.key==='Enter'){e.preventDefault(); id==='userInput'?sendUser():sendGuru();}
-  });
-});
-render();
-window.addEventListener('pagehide',()=>{
-  if(cameraStream) cameraStream.getTracks().forEach(t=>t.stop());
-});
-(function(){
-  const h=document.getElementById('secureHint');
-  if(h){
-    if(window.isSecureContext){
-      h.textContent='🔒 Secure context: Camera API उपलब्ध है।';
-    }else{
-      h.textContent='⚠️ अभी local content:// file है। Actual camera के लिए HTTPS URL चाहिए।';
-    }
-  }
-})();
+['userInput','guruInput'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();id==='userInput'?sendUser():sendGuru()}}));
+render();attachFirebaseListeners();
+window.addEventListener('pagehide',()=>{if(cameraStream)cameraStream.getTracks().forEach(t=>t.stop())});
 </script>
 </body>
 </html>
