@@ -29,12 +29,14 @@ button{border:0;border-radius:14px;padding:13px 18px;font-size:16px;font-weight:
 <div class="wrap">
   <div class="top">
     <div>🙏 Rishi Drishti • <b id="roleLabel">👤 User</b></div>
-    <button class="orange switch" onclick="switchRole()">↔ User / Guruji</button>
+    <div style="display:flex;gap:6px;align-items:center"><button class="switch" onclick="startFreshSession()">🆕 New Session</button><button class="orange switch" onclick="switchRole()">↔ User / Guruji</button></div>
   </div>
 
   <div id="appNotice" class="note hidden" role="status" aria-live="polite"></div>
 
   <div id="userView">
+<div id="userFlowGuide" class="note" style="margin-top:0"><b>User flow:</b> ① Method चुनें → ② Request भेजें → ③ Guruji Accept करें → ④ Chat/Video खोलें</div>
+  
     <div class="card">
       <div class="title">🙏 Rishi Drishti</div>
       <div class="sub">ज्ञान • दृष्टि • मार्गदर्शन • समाधान</div>
@@ -88,6 +90,8 @@ button{border:0;border-radius:14px;padding:13px 18px;font-size:16px;font-weight:
   </div>
 
   <div id="guruView" class="hidden">
+<div id="guruFlowGuide" class="note" style="margin-top:0"><b>Guruji flow:</b> ① Request देखें → ② Accept करें → ③ User की Chat/Video consultation लें</div>
+  
     <div class="card">
       <div class="title">🧘 Guruji Dashboard</div>
       <div class="sub">Guruji consultation & live video sessions</div>
@@ -162,7 +166,28 @@ function render(){
  document.getElementById('guruRequestTitle').textContent=`${methodEmoji(selectedMethod)} ${selectedMethod} • Demo User`;
  document.getElementById('guruRequestDetails').textContent=consultationDetails();
 }
-function switchRole(){role=role==='user'?'guru':'user';localStorage.setItem('rd_role',role);cleanupListeners();attachFirebaseListeners();render();window.scrollTo({top:0,behavior:'smooth'});showNotice(role==='guru'?'🧘 Guruji mode चालू है।':'👤 User mode चालू है।','success')}
+async function startFreshSession(){
+  try{
+    if(currentRequestId){
+      await db.ref('consultationRequests/'+currentRequestId).update({
+        status:'closed',
+        closedAt:firebase.database.ServerValue.TIMESTAMP
+      });
+    }
+  }catch(e){console.warn(e)}
+  endCall();
+  currentRequestId=null;
+  currentCallId=null;
+  consultationRequested=false;
+  consultationAccepted=false;
+  localStorage.removeItem('rd_request_id');
+  cleanupListeners();
+  attachFirebaseListeners();
+  render();
+  showNotice('🆕 नई consultation session शुरू हो गई है। पुराना flow clear है।','success');
+}
+
+function switchRole(){role=role==='user'?'guru':'user';localStorage.setItem('rd_role',role);cleanupListeners();attachFirebaseListeners();render();window.scrollTo({top:0,behavior:'smooth'});showNotice(role==='guru'?'🧘 Guruji mode: incoming requests यहाँ दिखेंगी।':'👤 User mode: यहाँ से नई consultation शुरू करें।','success')}
 function showNotice(message,type=''){const n=document.getElementById('appNotice');n.textContent=message;n.className='note'+(type?' '+type:'');n.classList.remove('hidden');clearTimeout(window.__noticeTimer);window.__noticeTimer=setTimeout(()=>n.classList.add('hidden'),4500)}
 function methodEmoji(m){return m==='कुंडली'?'🔮':m==='सामुद्रिक शास्त्र'?'🕉️':'✋'}
 function selectMethod(method){selectedMethod=method;document.getElementById('methodKundli').classList.toggle('active',method==='कुंडली');document.getElementById('methodSamudrik').classList.toggle('active',method==='सामुद्रिक शास्त्र');document.getElementById('methodPalm').classList.toggle('active',method==='हस्तरेखा');document.getElementById('kundliFields').classList.toggle('hidden',method!=='कुंडली');document.getElementById('methodNote').textContent='चयन: '+methodEmoji(method)+' '+method}
